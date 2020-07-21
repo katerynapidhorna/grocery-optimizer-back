@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
      */
     static associate(models) {
       productStore.belongsTo(models.product);
-      productStore.belongsTo(models.store);
+      productStore.belongsTo(models.store)
       // define association here
     }
   };
