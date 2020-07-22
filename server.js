@@ -1,11 +1,16 @@
 const express = require("express");
-
+// auth_____________________START
+const { toJWT } = require("./auth/jwt");
+const authMiddleware = require("./auth/middleware");
+// auth_____________________END
+// require models_________________________________START
 const Products = require("./models").product;
 const ShoppingLists = require("./models").shoppingList;
 const Users = require("./models").user;
 const Stores = require("./models").store;
 const ProductStores = require("./models").productStore;
 const ProductShoppinglists = require("./models").productShoppingList;
+// require models_________________________________END
 
 const { PORT } = require("./config/constants");
 const cors = require("cors");
@@ -26,7 +31,9 @@ const UserType = new GraphQLObjectType({
   name: "User",
   description: "This represents a user",
   fields: () => ({
-    id: { type: GraphQLNonNull(GraphQLInt) },
+    id: {
+      type: GraphQLNonNull(GraphQLInt),
+    },
     email: { type: GraphQLNonNull(GraphQLString) },
     password: { type: GraphQLNonNull(GraphQLString) },
   }),
@@ -92,16 +99,28 @@ const RootQueryType = new GraphQLObjectType({
     users: {
       type: new GraphQLList(UserType),
       description: "List of all products",
-      resolve: () => Users.findAll(),
+      resolve: (p, args, context) => {
+        console.log("context", context.headers);
+        if (args.id) {
+          return Users.findAll({ where: { id: args.id } });
+        } else {
+          return Users.findAll();
+        }
+      },
+      args: {
+        id: {
+          type: GraphQLInt,
+        },
+      },
     },
     products: {
       type: new GraphQLList(ProductType),
       description: "List of all products",
       resolve: () => Products.findAll(),
     },
-    stores:{
+    stores: {
       type: new GraphQLList(StoreType),
-      resolve: () => Stores.findAll()
+      resolve: () => Stores.findAll(),
     },
     shoppingLists: {
       type: new GraphQLList(ShoppinglistType),
@@ -125,8 +144,8 @@ const RootQueryType = new GraphQLObjectType({
         return ProductStores.findAll({
           attributes: { include: ["id"] },
         });
-    }
-  }
+      },
+    },
   }),
 });
 
