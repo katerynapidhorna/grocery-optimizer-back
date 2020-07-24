@@ -92,6 +92,8 @@ const ProductShoppinglistType = new GraphQLObjectType({
   }),
 });
 
+
+const userId = 17
 const RootQueryType = new GraphQLObjectType({
   name: "Query",
   description: "Root Query",
@@ -100,18 +102,20 @@ const RootQueryType = new GraphQLObjectType({
       type: new GraphQLList(UserType),
       description: "List of all products",
       resolve: (p, args, context) => {
-        console.log("context", context.headers);
-        if (args.id) {
-          return Users.findAll({ where: { id: args.id } });
-        } else {
-          return Users.findAll();
-        }
+        // console.log("auth-h", context.headers.authorization);
+          return Users.findAll({ where: { id: userId } });
       },
       args: {
         id: {
           type: GraphQLInt,
         },
       },
+      shoppingLists: {
+        type: new GraphQLList(ShoppinglistType),
+        description: "List of all shopping list",
+        resolve: () => ShoppingLists.findAll({where:{userId}}),
+        
+      }
     },
     products: {
       type: new GraphQLList(ProductType),
@@ -126,7 +130,7 @@ const RootQueryType = new GraphQLObjectType({
       type: new GraphQLList(ShoppinglistType),
       description: "List of all shopping list",
       description: "List of all stores",
-      resolve: () => ShoppingLists.findAll(),
+      resolve: () => ShoppingLists.findAll({where:{userId}}),
     },
     productShoppinglists: {
       type: new GraphQLList(ProductShoppinglistType),
@@ -156,6 +160,8 @@ const schema = new GraphQLSchema({
 app.listen(PORT, () => {
   console.log(`Listening on port: ${PORT}`);
 });
+
+console.log("authMiddleware", authMiddleware);
 
 app.use(
   "/graphql",
