@@ -58,6 +58,7 @@ const ProductType = new GraphQLObjectType({
     name: { type: GraphQLNonNull(GraphQLString) },
     amount: { type: GraphQLInt },
     unit: { type: GraphQLString },
+    purchased: { type: GraphQLBoolean },
   }),
 });
 
@@ -68,6 +69,30 @@ const ShoppinglistType = new GraphQLObjectType({
     id: { type: GraphQLNonNull(GraphQLInt) },
     title: { type: GraphQLNonNull(GraphQLString) },
     userId: { type: GraphQLNonNull(GraphQLInt) },
+    products: {
+      type: new GraphQLList(ProductType),
+      resolve(parentDataSource, args, context) {
+        return ShoppingLists.findByPk(parentDataSource.dataValues.id, {
+          include: [
+            {
+              model: Products,
+            },
+          ],
+        }).then((shoppingsList) => {
+          return shoppingsList.dataValues.products.map((product) => {
+            const productFields = product.dataValues;
+            const shoppingList = product.dataValues.productShoppingList;
+            return {
+              id: productFields.id,
+              name: productFields.name,
+              amount: shoppingList.dataValues.productAmount,
+              unit: productFields.unit,
+              purchased: shoppingList.dataValues.purchased,
+            };
+          });
+        });
+      },
+    },
   }),
 });
 
@@ -94,8 +119,7 @@ const ProductShoppinglistType = new GraphQLObjectType({
   }),
 });
 
-
-const userId = 17
+const userId = 18;
 const RootQueryType = new GraphQLObjectType({
   name: "Query",
   description: "Root Query",
@@ -105,7 +129,7 @@ const RootQueryType = new GraphQLObjectType({
       description: "List of all products",
       resolve: (p, args, context) => {
         // console.log("auth-h", context.headers.authorization);
-          return Users.findAll({ where: { id: userId } });
+        return Users.findAll({ where: { id: userId } });
       },
       args: {
         id: {
@@ -115,9 +139,26 @@ const RootQueryType = new GraphQLObjectType({
       shoppingLists: {
         type: new GraphQLList(ShoppinglistType),
         description: "List of all shopping list",
-        resolve: () => ShoppingLists.findAll({where:{userId}}),
-        
-      }
+        resolve: () => ShoppingLists.findAll({ where: { userId } }),
+      },
+      productShoppingList: {
+        type: ShoppinglistType,
+        description: "List of all products in current list",
+        products: {
+          type: new GraphQLList(ProductType),
+          resolve: (p, args, k) => {
+            console.log(p);
+            return Products.findAll();
+          },
+        },
+        resolve: (p, args) => {
+          return ProductShoppinglists.findAll({
+            where: {
+              shoppinglistId: 25,
+            },
+          });
+        },
+      },
     },
     products: {
       type: new GraphQLList(ProductType),
@@ -132,7 +173,7 @@ const RootQueryType = new GraphQLObjectType({
       type: new GraphQLList(ShoppinglistType),
       description: "List of all shopping list",
       description: "List of all stores",
-      resolve: () => ShoppingLists.findAll({where:{userId}}),
+      resolve: () => ShoppingLists.findAll({ where: { userId } }),
     },
     productShoppinglists: {
       type: new GraphQLList(ProductShoppinglistType),
@@ -158,27 +199,27 @@ const RootQueryType = new GraphQLObjectType({
 // mutations____________________________________________START
 
 const RootMutationType = new GraphQLObjectType({
-  name: 'mutation',
-  fields:()=>({
+  name: "mutation",
+  fields: () => ({
     addShoppinList: {
       type: ShoppinglistType,
       args: {
-        title: {type: GraphQLNonNull(GraphQLString)},
-        userId: {type: GraphQLNonNull(GraphQLInt)}
+        title: { type: GraphQLNonNull(GraphQLString) },
+        userId: { type: GraphQLNonNull(GraphQLInt) },
       },
-      resolve: (parent, args) =>{
-        const newList = {title: args.title, userId:args.userId}
-        ShoppingLists.create(newList)
-      }
-    }
-  })
-})
+      resolve: (parent, args) => {
+        const newList = { title: args.title, userId: args.userId };
+        ShoppingLists.create(newList);
+      },
+    },
+  }),
+});
 
 // mutations____________________________________________END
 
 const schema = new GraphQLSchema({
   query: RootQueryType,
-  mutation: RootMutationType
+  mutation: RootMutationType,
 });
 
 app.listen(PORT, () => {
