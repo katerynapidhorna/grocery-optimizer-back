@@ -23,6 +23,8 @@ const {
   GraphQLInt,
   GraphQLNonNull,
   GraphQLBoolean,
+  GraphQLInputObjectType,
+  GraphQLScalarType,
 } = require("graphql");
 const app = express();
 app.use(cors());
@@ -153,8 +155,30 @@ const RootQueryType = new GraphQLObjectType({
   }),
 });
 
+// mutations____________________________________________START
+
+const RootMutationType = new GraphQLObjectType({
+  name: 'mutation',
+  fields:()=>({
+    addShoppinList: {
+      type: ShoppinglistType,
+      args: {
+        title: {type: GraphQLNonNull(GraphQLString)},
+        userId: {type: GraphQLNonNull(GraphQLInt)}
+      },
+      resolve: (parent, args) =>{
+        const newList = {title: args.title, userId:args.userId}
+        ShoppingLists.create(newList)
+      }
+    }
+  })
+})
+
+// mutations____________________________________________END
+
 const schema = new GraphQLSchema({
   query: RootQueryType,
+  mutation: RootMutationType
 });
 
 app.listen(PORT, () => {
