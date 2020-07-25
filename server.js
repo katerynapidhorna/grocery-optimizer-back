@@ -2,6 +2,7 @@ const express = require("express");
 // auth_____________________START
 const { toJWT } = require("./auth/jwt");
 const authMiddleware = require("./auth/middleware");
+const authRouter = require("./routers/auth");
 // auth_____________________END
 // require models_________________________________START
 const Products = require("./models").product;
@@ -28,6 +29,8 @@ const {
 } = require("graphql");
 const app = express();
 app.use(cors());
+const bodyParserMiddleWare = express.json();
+app.use(bodyParserMiddleWare);
 
 const UserType = new GraphQLObjectType({
   name: "User",
@@ -72,6 +75,7 @@ const ShoppinglistType = new GraphQLObjectType({
     products: {
       type: new GraphQLList(ProductType),
       resolve(parentDataSource, args, context) {
+        console.log(context.user.dataValues.id)
         return ShoppingLists.findByPk(parentDataSource.dataValues.id, {
           include: [
             {
@@ -119,7 +123,7 @@ const ProductShoppinglistType = new GraphQLObjectType({
   }),
 });
 
-const userId = 18;
+// const userId = 17;
 const RootQueryType = new GraphQLObjectType({
   name: "Query",
   description: "Root Query",
@@ -129,7 +133,7 @@ const RootQueryType = new GraphQLObjectType({
       description: "List of all products",
       resolve: (p, args, context) => {
         // console.log("auth-h", context.headers.authorization);
-        return Users.findAll({ where: { id: userId } });
+        return Users.findAll({ where: { id: context.user.dataValues.id } });
       },
       args: {
         id: {
@@ -139,7 +143,7 @@ const RootQueryType = new GraphQLObjectType({
       shoppingLists: {
         type: new GraphQLList(ShoppinglistType),
         description: "List of all shopping list",
-        resolve: () => ShoppingLists.findAll({ where: { userId } }),
+        resolve: (parent,args,context) => ShoppingLists.findAll({ where: { userId:context.user.dataValues.id } }),
       },
       productShoppingList: {
         type: ShoppinglistType,
@@ -173,7 +177,7 @@ const RootQueryType = new GraphQLObjectType({
       type: new GraphQLList(ShoppinglistType),
       description: "List of all shopping list",
       description: "List of all stores",
-      resolve: () => ShoppingLists.findAll({ where: { userId } }),
+      resolve: (p,a,context) => ShoppingLists.findAll({ where: { userId: context.user.dataValues.id} }),
     },
     productShoppinglists: {
       type: new GraphQLList(ProductShoppinglistType),
@@ -212,6 +216,23 @@ const RootMutationType = new GraphQLObjectType({
         ShoppingLists.create(newList);
       },
     },
+    updateShoppingList: {
+      type: new GraphQLList(ProductType),
+      args: {
+        id: { type: GraphQLInt },
+        name: { type: GraphQLString },
+        amount: { type: GraphQLInt },
+        unit: { type: GraphQLString },
+      },
+      resolve: (parent, args) => {
+        console.log("args", args);
+        // const newProduct = [
+        // { name: args.name, amount: args.amount, unit: args.unit },
+        // ];
+        // console.log(newProduct);
+        // Products.create(newProduct)
+      },
+    },
   }),
 });
 
@@ -222,33 +243,24 @@ const schema = new GraphQLSchema({
   mutation: RootMutationType,
 });
 
-app.listen(PORT, () => {
-  console.log(`Listening on port: ${PORT}`);
-});
 
-console.log("authMiddleware", authMiddleware);
+app.use("/", authRouter);
 
 app.use(
   "/graphql",
+  // (req, res, next) => {
+  //   // To make graphiql work without auth header as tool does not support it
+  //   if (!process.env.APP_MODE === "development") {
+  //     next();
+  //   } else {
+  //     return authMiddleware(req, res, next);
+  //   }
+  // },
+  authMiddleware,
   graphqlHTTP({
     schema: schema,
     graphiql: true,
   })
 );
 
-// const cors = require('cors');
-// const { PORT } = require("./config/constants");
-
-// const Products = require('./models').product
-
-// const app = express();
-// app.use(cors())
-
-// app.get('/products',async(req,res)=>{
-//   const products = await Products.findAll();
-//   res.send(products)
-// })
-
-// app.listen(PORT, () => {
-//   console.log(`Listening on port: ${PORT}`);
-// });
+app.listen(PORT, () => {});
