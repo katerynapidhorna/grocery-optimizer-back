@@ -1,4 +1,6 @@
 const express = require("express");
+const bcrypt = require('bcrypt')
+const { SALT_ROUNDS } = require("./config/constants"); 
 // auth_____________________START
 const { toJWT } = require("./auth/jwt");
 const authMiddleware = require("./auth/middleware");
@@ -123,7 +125,7 @@ const ProductShoppinglistType = new GraphQLObjectType({
   }),
 });
 
-// const userId = 17;
+
 const RootQueryType = new GraphQLObjectType({
   name: "Query",
   description: "Root Query",
@@ -132,7 +134,6 @@ const RootQueryType = new GraphQLObjectType({
       type: new GraphQLList(UserType),
       description: "List of all products",
       resolve: (p, args, context) => {
-        // console.log("auth-h", context.headers.authorization);
         return Users.findAll({ where: { id: context.user.dataValues.id } });
       },
       args: {
@@ -216,6 +217,19 @@ const RootMutationType = new GraphQLObjectType({
         ShoppingLists.create(newList);
       },
     },
+    // sign up_______________________________START
+    createNewUser:{
+      type: UserType,
+      args: {
+        email: { type: GraphQLNonNull(GraphQLString) },
+        password: { type: GraphQLNonNull(GraphQLString) }
+      },
+      resolve: (parent, args) => {
+        const newUser = { email: args.email, password: bcrypt.hashSync(args.password, SALT_ROUNDS) };
+        Users.create(newUser);
+      }
+    },    
+    // sign up_______________________________END
     updateShoppingList: {
       type: new GraphQLList(ProductType),
       args: {
@@ -248,15 +262,15 @@ app.use("/", authRouter);
 
 app.use(
   "/graphql",
-  // (req, res, next) => {
-  //   // To make graphiql work without auth header as tool does not support it
-  //   if (!process.env.APP_MODE === "development") {
-  //     next();
-  //   } else {
-  //     return authMiddleware(req, res, next);
-  //   }
-  // },
-  authMiddleware,
+  (req, res, next) => {
+    // To make graphiql work without auth header as tool does not support it
+    if (process.env.APP_MODE === "development") {
+      next();
+    } else {
+      return authMiddleware(req, res, next);
+    }
+  },
+  // authMiddleware,
   graphqlHTTP({
     schema: schema,
     graphiql: true,
