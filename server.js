@@ -1,6 +1,6 @@
 const express = require("express");
-const bcrypt = require('bcrypt')
-const { SALT_ROUNDS } = require("./config/constants"); 
+const bcrypt = require("bcrypt");
+const { SALT_ROUNDS } = require("./config/constants");
 // auth_____________________START
 const { toJWT } = require("./auth/jwt");
 const authMiddleware = require("./auth/middleware");
@@ -67,6 +67,16 @@ const ProductType = new GraphQLObjectType({
   }),
 });
 
+const ShoppingListUpdateItem = new GraphQLInputObjectType({
+  name: "ShoppingListUpdateItem",
+  description: "Data for updating/creating single shopping list item",
+  fields: () => ({
+    name: { type: GraphQLNonNull(GraphQLString) },
+    amount: { type: GraphQLInt },
+    id: { type: GraphQLInt },
+  }),
+});
+
 const ShoppinglistType = new GraphQLObjectType({
   name: "ShoppingList",
   description: "This represents a shopping list",
@@ -77,7 +87,7 @@ const ShoppinglistType = new GraphQLObjectType({
     products: {
       type: new GraphQLList(ProductType),
       resolve(parentDataSource, args, context) {
-        console.log(context.user.dataValues.id)
+        console.log(context.user.dataValues.id);
         return ShoppingLists.findByPk(parentDataSource.dataValues.id, {
           include: [
             {
@@ -125,16 +135,15 @@ const ProductShoppinglistType = new GraphQLObjectType({
   }),
 });
 
-
+const userID = 17;
 const RootQueryType = new GraphQLObjectType({
   name: "Query",
   description: "Root Query",
   fields: () => ({
-    users: {
-      type: new GraphQLList(UserType),
-      description: "List of all products",
+    user: {
+      type: UserType,
       resolve: (p, args, context) => {
-        return Users.findAll({ where: { id: context.user.dataValues.id } });
+        return Users.findByPk(context.user.dataValues.id);
       },
       args: {
         id: {
@@ -144,7 +153,10 @@ const RootQueryType = new GraphQLObjectType({
       shoppingLists: {
         type: new GraphQLList(ShoppinglistType),
         description: "List of all shopping list",
-        resolve: (parent,args,context) => ShoppingLists.findAll({ where: { userId:context.user.dataValues.id } }),
+        resolve: (parent, args, context) =>
+          ShoppingLists.findAll({
+            where: { userId: context.user.dataValues.id }, 
+          }),
       },
       productShoppingList: {
         type: ShoppinglistType,
@@ -152,7 +164,6 @@ const RootQueryType = new GraphQLObjectType({
         products: {
           type: new GraphQLList(ProductType),
           resolve: (p, args, k) => {
-            console.log(p);
             return Products.findAll();
           },
         },
@@ -178,7 +189,10 @@ const RootQueryType = new GraphQLObjectType({
       type: new GraphQLList(ShoppinglistType),
       description: "List of all shopping list",
       description: "List of all stores",
-      resolve: (p,a,context) => ShoppingLists.findAll({ where: { userId: context.user.dataValues.id} }),
+      resolve: (p, a, context) =>
+        ShoppingLists.findAll({
+          where: { userId: context.user.dataValues.id },
+        }),
     },
     productShoppinglists: {
       type: new GraphQLList(ProductShoppinglistType),
@@ -218,33 +232,38 @@ const RootMutationType = new GraphQLObjectType({
       },
     },
     // sign up_______________________________START
-    createNewUser:{
+    createNewUser: {
       type: UserType,
       args: {
         email: { type: GraphQLNonNull(GraphQLString) },
-        password: { type: GraphQLNonNull(GraphQLString) }
+        password: { type: GraphQLNonNull(GraphQLString) },
       },
       resolve: (parent, args) => {
-        const newUser = { email: args.email, password: bcrypt.hashSync(args.password, SALT_ROUNDS) };
+        const newUser = {
+          email: args.email,
+          password: bcrypt.hashSync(args.password, SALT_ROUNDS),
+        };
         Users.create(newUser);
-      }
-    },    
+      },
+    },
+
     // sign up_______________________________END
     updateShoppingList: {
       type: new GraphQLList(ProductType),
       args: {
+        title: { type: GraphQLString },
         id: { type: GraphQLInt },
-        name: { type: GraphQLString },
-        amount: { type: GraphQLInt },
-        unit: { type: GraphQLString },
+        items: { type: new GraphQLList(ShoppingListUpdateItem) },
       },
-      resolve: (parent, args) => {
+      resolve: async (parent, args) => {
+        // !!! enshure that currently authenticated user is an owner of the shopping list
         console.log("args", args);
         // const newProduct = [
         // { name: args.name, amount: args.amount, unit: args.unit },
         // ];
         // console.log(newProduct);
         // Products.create(newProduct)
+        return [];
       },
     },
   }),
@@ -257,20 +276,22 @@ const schema = new GraphQLSchema({
   mutation: RootMutationType,
 });
 
-
 app.use("/", authRouter);
 
 app.use(
   "/graphql",
-  (req, res, next) => {
-    // To make graphiql work without auth header as tool does not support it
-    if (process.env.APP_MODE === "development") {
-      next();
-    } else {
-      return authMiddleware(req, res, next);
-    }
-  },
-  // authMiddleware,
+  // (req, res, next) => {
+  //   // To make graphiql work without auth header as tool does not support it
+  //   if (process.env.APP_MODE === "development") {
+  //     req.user = {
+  //       id: 17,
+  //     };
+  //     next();
+  //   } else {
+  //     return authMiddleware(req, res, next);
+  //   }
+  // },
+  authMiddleware,
   graphqlHTTP({
     schema: schema,
     graphiql: true,
