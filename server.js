@@ -251,23 +251,6 @@ const RootMutationType = new GraphQLObjectType({
         ShoppingLists.create(newList);
       },
     },
-    // sign up_______________________________START
-    createNewUser: {
-      type: UserType,
-      args: {
-        email: { type: GraphQLNonNull(GraphQLString) },
-        password: { type: GraphQLNonNull(GraphQLString) },
-      },
-      resolve: (parent, args) => {
-        const newUser = {
-          email: args.email,
-          password: bcrypt.hashSync(args.password, SALT_ROUNDS),
-        };
-        Users.create(newUser);
-      },
-    },
-
-    // sign up_______________________________END
     updateShoppingList: {
       type: UpdateShoppingList,
       args: {

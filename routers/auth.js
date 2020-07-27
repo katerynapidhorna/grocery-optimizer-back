@@ -34,17 +34,15 @@ router.post("/login", async (req, res, next) => {
 });
 
 router.post("/signup", async (req, res) => {
-  const { email, password, name, isArtist } = req.body;
-  if (!email || !password || !name) {
+  const { email, password } = req.body;
+  if (!email || !password) {
     return res.status(400).send("Please provide an email, password and a name");
   }
 
   try {
     const newUser = await User.create({
       email,
-      password: bcrypt.hashSync(password, SALT_ROUNDS),
-      name,
-      isArtist
+      password: bcrypt.hashSync(password, SALT_ROUNDS)
     });
 
     delete newUser.dataValues["password"]; // don't send back the password hash
@@ -66,10 +64,11 @@ router.post("/signup", async (req, res) => {
 // The /me endpoint can be used to:
 // - get the users email & name using only their token
 // - checking if a token is (still) valid
-router.get("/me", authMiddleware, async (req, res) => {
-  // don't send back the password hash
-  delete req.user.dataValues["password"];
-  res.status(200).send({ ...req.user.dataValues });
-});
+
+// router.get("/me", authMiddleware, async (req, res) => {
+//   // don't send back the password hash
+//   delete req.user.dataValues["password"];
+//   res.status(200).send({ ...req.user.dataValues });
+// });
 
 module.exports = router;
