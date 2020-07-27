@@ -77,6 +77,26 @@ const ShoppingListUpdateItem = new GraphQLInputObjectType({
   }),
 });
 
+const ShoppingListUpdateTitle = new GraphQLInputObjectType({
+  name: "ShoppingListUpdateTitle",
+  fields: () => ({
+    title: { type: GraphQLString },
+    id: { type: GraphQLInt },
+  }),
+});
+
+// new type for updating certain shopping list____START
+const UpdateShoppingList = new GraphQLObjectType({
+  name: "UpdateShoppingList",
+  description:
+    "need to update data for certain shoppin list and related tables",
+  fields: () => ({
+    list: { type: GraphQLNonNull(GraphQLString) },
+    products: { type: new GraphQLList(ProductType) },
+  }),
+});
+// new type for updating certain shopping list____END
+
 const ShoppinglistType = new GraphQLObjectType({
   name: "ShoppingList",
   description: "This represents a shopping list",
@@ -87,7 +107,7 @@ const ShoppinglistType = new GraphQLObjectType({
     products: {
       type: new GraphQLList(ProductType),
       resolve(parentDataSource, args, context) {
-        console.log(context.user.dataValues.id);
+        // console.log(context.user.dataValues.id);
         return ShoppingLists.findByPk(parentDataSource.dataValues.id, {
           include: [
             {
@@ -155,7 +175,7 @@ const RootQueryType = new GraphQLObjectType({
         description: "List of all shopping list",
         resolve: (parent, args, context) =>
           ShoppingLists.findAll({
-            where: { userId: context.user.dataValues.id }, 
+            where: { userId: context.user.dataValues.id },
           }),
       },
       productShoppingList: {
@@ -249,20 +269,109 @@ const RootMutationType = new GraphQLObjectType({
 
     // sign up_______________________________END
     updateShoppingList: {
-      type: new GraphQLList(ProductType),
+      type: UpdateShoppingList,
       args: {
-        title: { type: GraphQLString },
+        list: { type: GraphQLNonNull(ShoppingListUpdateTitle) },
         id: { type: GraphQLInt },
-        items: { type: new GraphQLList(ShoppingListUpdateItem) },
+        products: { type: new GraphQLList(ShoppingListUpdateItem) },
       },
-      resolve: async (parent, args) => {
-        // !!! enshure that currently authenticated user is an owner of the shopping list
+      resolve: async (parent, args, context) => {
         console.log("args", args);
-        // const newProduct = [
-        // { name: args.name, amount: args.amount, unit: args.unit },
-        // ];
-        // console.log(newProduct);
-        // Products.create(newProduct)
+        console.log("userID", context.user.id);
+        // !!! enshure that currently authenticated user is an owner of the shopping list
+        if (args.list.id) {
+          const ownersList = await ShoppingLists.findOne({
+            where: {
+              id: args.list.id,
+              userId: context.user.id,
+            },
+          });
+          await ownersList.update({ title: args.list.title });
+          // updating join table ProductShoppinglists____________________START
+          // find all rows in join table with this list id
+          const result = await ProductShoppinglists.findAll({
+            where: {
+              shoppinglistId: args.list.id,
+            },
+          });
+          //getting array of products ids
+          const productsWithId = await args.products.filter((pId) => {
+            if (pId.id !== null) {
+              return pId.id;
+            }
+          });
+
+          const productsWithIdArrayOfIds = productsWithId.map((p) => {
+            return p.id;
+          });
+          // delete them all from ProductShoppinglists result
+          productsWithIdArrayOfIds.forEach((id) => {
+            ProductShoppinglists.destroy({
+              where: {
+                productId: id,
+              },
+            });
+          });
+          // add new ones
+          productsWithId.forEach((p) => {
+            // console.log(p);
+            ProductShoppinglists.create({
+              productId: p.id,
+              shoppinglistId: args.list.id,
+              productAmount: p.amount,
+              purchased: false,
+            });
+          });
+          //adding all new products ids
+
+          // updating join table ProductShoppinglists____________________END
+          //updating table Products____________________________START
+          productsWithId.forEach((p) => {
+            Products.update(
+              { name: p.name, amount: p.amount },
+              {
+                where: {
+                  id: p.id,
+                },
+              }
+            );
+          });
+          const productsWithoutId = await args.products.filter((p) => {
+            if (p.id === null) {
+              return p;
+            }
+          });
+
+          let productsWithoutIdCreated = productsWithoutId.map((p) => {
+            return Products.create({
+              name: p.name,
+              amount: p.amount,
+            });
+          });
+          await Promise.all(productsWithoutIdCreated);
+
+          //updating table Products____________________________END
+          //adding all products ids which were just created to a ProductShoppingList table___START
+          const allProductIds = await Products.findAll();
+          const AllProductId = allProductIds.map((p) => {
+            return p.dataValues.id
+          });
+          
+          AllProductId.forEach(async(id)=>{
+            const existingId = await ProductShoppinglists.findByPk(id);
+            if(!existingId) {
+              ProductShoppinglists.create({
+                productId:id,
+                shoppinglistId:args.list.id,
+                purchased:false
+              })
+            }
+            console.log('existingId',existingId)
+          })  
+          //adding all products ids which were just created to a ProductShoppingList table___END  
+
+        }
+
         return [];
       },
     },
