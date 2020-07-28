@@ -244,11 +244,11 @@ const RootMutationType = new GraphQLObjectType({
       type: ShoppinglistType,
       args: {
         title: { type: GraphQLNonNull(GraphQLString) },
-        userId: { type: GraphQLNonNull(GraphQLInt) },
       },
-      resolve: (parent, args) => {
-        const newList = { title: args.title, userId: args.userId };
-        ShoppingLists.create(newList);
+      resolve: async (parent, args, context) => {
+        const newList = { title: args.title, userId: context.user.id };
+        const result = await ShoppingLists.create(newList);
+        return result;
       },
     },
     updateShoppingList: {
@@ -259,8 +259,6 @@ const RootMutationType = new GraphQLObjectType({
         products: { type: new GraphQLList(ShoppingListUpdateItem) },
       },
       resolve: async (parent, args, context) => {
-        console.log("args", args);
-        console.log("userID", context.user.id);
         // !!! enshure that currently authenticated user is an owner of the shopping list
         if (args.list.id) {
           const ownersList = await ShoppingLists.findOne({
@@ -297,7 +295,6 @@ const RootMutationType = new GraphQLObjectType({
           });
           // add new ones
           productsWithId.forEach((p) => {
-            // console.log(p);
             ProductShoppinglists.create({
               productId: p.id,
               shoppinglistId: args.list.id,
@@ -337,22 +334,20 @@ const RootMutationType = new GraphQLObjectType({
           //adding all products ids which were just created to a ProductShoppingList table___START
           const allProductIds = await Products.findAll();
           const AllProductId = allProductIds.map((p) => {
-            return p.dataValues.id
+            return p.dataValues.id;
           });
-          
-          AllProductId.forEach(async(id)=>{
-            const existingId = await ProductShoppinglists.findByPk(id);
-            if(!existingId) {
-              ProductShoppinglists.create({
-                productId:id,
-                shoppinglistId:args.list.id,
-                purchased:false
-              })
-            }
-            console.log('existingId',existingId)
-          })  
-          //adding all products ids which were just created to a ProductShoppingList table___END  
 
+          AllProductId.forEach(async (id) => {
+            const existingId = await ProductShoppinglists.findByPk(id);
+            if (!existingId) {
+              ProductShoppinglists.create({
+                productId: id,
+                shoppinglistId: args.list.id,
+                purchased: false,
+              });
+            }
+          });
+          //adding all products ids which were just created to a ProductShoppingList table___END
         }
 
         return [];
