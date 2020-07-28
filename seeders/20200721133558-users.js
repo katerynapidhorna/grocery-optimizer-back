@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
@@ -7,13 +7,15 @@ module.exports = {
       [
         {
           email: "test@test.com",
-          password: "123123",
+          password:
+            "$2b$10$VdU0QDXxRGnXl9PvchlH8OHYXMiBhYv2oRXpLDOkX1yyc.Gf1Z5jC",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
         {
           email: "a@a.com",
-          password: "a",
+          password:
+            "$2b$10$YP2n0j8R1v4ORLftSSC9tOpErRr9knjwR0sxFQa6Mxy4klIes1sWa",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -28,7 +30,7 @@ module.exports = {
      *   name: 'John Doe',
      *   isBetaMember: false
      * }], {});
-    */
+     */
   },
 
   down: async (queryInterface, Sequelize) => {
@@ -39,5 +41,5 @@ module.exports = {
      * Example:
      * await queryInterface.bulkDelete('People', null, {});
      */
-  }
+  },
 };

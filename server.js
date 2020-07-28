@@ -28,6 +28,7 @@ const {
   GraphQLBoolean,
   GraphQLInputObjectType,
   GraphQLScalarType,
+  GraphQLFloat,
 } = require("graphql");
 const app = express();
 app.use(cors());
@@ -55,6 +56,14 @@ const StoreType = new GraphQLObjectType({
   }),
 });
 
+const ProductPrice = new GraphQLObjectType({
+  name: "ProductPrice",
+  fields: () => ({
+    storeId: { type: GraphQLInt },
+    price: { type: GraphQLFloat },
+  }),
+});
+
 const ProductType = new GraphQLObjectType({
   name: "Product",
   description: "This represents a product",
@@ -64,6 +73,23 @@ const ProductType = new GraphQLObjectType({
     amount: { type: GraphQLInt },
     unit: { type: GraphQLString },
     purchased: { type: GraphQLBoolean },
+    prices: {
+      type: new GraphQLList(ProductPrice),
+      resolve: async (product) => {
+        const productId = product.id;
+        const productInfoByStore = await ProductStores.findAll({
+          where: {
+            productId: productId,
+          },
+        });
+        return productInfoByStore.map((p) => {
+          return {
+            storeId: p.storeId,
+            price: p.productPrice,
+          };
+        });
+      },
+    },
   }),
 });
 
@@ -190,7 +216,7 @@ const RootQueryType = new GraphQLObjectType({
         resolve: (p, args) => {
           return ProductShoppinglists.findAll({
             where: {
-              shoppinglistId: 25,
+              shoppinglistId: 25, // TODO: figure out
             },
           });
         },
@@ -241,7 +267,6 @@ const RootQueryType = new GraphQLObjectType({
         },
       },
       resolve: (p, args, context) => {
-        console.log(args);
         return ShoppingLists.findByPk(args.id);
       },
     },
@@ -398,4 +423,6 @@ app.use(
   })
 );
 
-app.listen(PORT, () => {});
+app.listen(PORT, () => {
+  console.log("Server started:", PORT);
+});
