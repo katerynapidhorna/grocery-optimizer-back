@@ -207,12 +207,12 @@ const RootQueryType = new GraphQLObjectType({
     },
     shoppingLists: {
       type: new GraphQLList(ShoppinglistType),
-      description: "List of all shopping list",
-      description: "List of all stores",
-      resolve: (p, a, context) =>
-        ShoppingLists.findAll({
+      description: "List of all shopping lists",
+      resolve: (p, a, context) => {
+        return ShoppingLists.findAll({
           where: { userId: context.user.dataValues.id },
-        }),
+        });
+      },
     },
     productShoppinglists: {
       type: new GraphQLList(ProductShoppinglistType),
@@ -230,6 +230,19 @@ const RootQueryType = new GraphQLObjectType({
         return ProductStores.findAll({
           attributes: { include: ["id"] },
         });
+      },
+    },
+    shoppingList: {
+      type: ShoppinglistType,
+      description: "Single shopping list",
+      args: {
+        id: {
+          type: GraphQLInt,
+        },
+      },
+      resolve: (p, args, context) => {
+        console.log(args);
+        return ShoppingLists.findByPk(args.id);
       },
     },
   }),
