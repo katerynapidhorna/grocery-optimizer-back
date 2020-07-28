@@ -28,6 +28,7 @@ const {
   GraphQLBoolean,
   GraphQLInputObjectType,
   GraphQLScalarType,
+  GraphQLFloat,
 } = require("graphql");
 const app = express();
 app.use(cors());
@@ -55,6 +56,14 @@ const StoreType = new GraphQLObjectType({
   }),
 });
 
+const ProductPrice = new GraphQLObjectType({
+  name: "ProductPrice",
+  fields: () => ({
+    storeId: { type: GraphQLInt },
+    price: { type: GraphQLFloat },
+  }),
+});
+
 const ProductType = new GraphQLObjectType({
   name: "Product",
   description: "This represents a product",
@@ -64,6 +73,24 @@ const ProductType = new GraphQLObjectType({
     amount: { type: GraphQLInt },
     unit: { type: GraphQLString },
     purchased: { type: GraphQLBoolean },
+    prices: {
+      type: new GraphQLList(ProductPrice),
+      resolve: async (product) => {
+        const productId = product.id;
+        const productInfoByStore = await ProductStores.findAll({
+          where: {
+            productId: productId,
+          },
+          order: [["createdAt", "DESC"]],
+        });
+        return productInfoByStore.map((p) => {
+          return {
+            storeId: p.storeId,
+            price: p.productPrice,
+          };
+        });
+      },
+    },
   }),
 });
 
@@ -84,6 +111,19 @@ const ShoppingListUpdateTitle = new GraphQLInputObjectType({
     id: { type: GraphQLInt },
   }),
 });
+
+// new type for updating product stor join table____START
+const NewProductPrices = new GraphQLInputObjectType({
+  name: "NewProductPrices",
+  description: "fields for updating price per product id and store id",
+  fields: () => ({
+    productId: { type: GraphQLNonNull(GraphQLInt) },
+    storeId: { type: GraphQLNonNull(GraphQLInt) },
+    productPrice: { type: GraphQLInt },
+  }),
+});
+
+// new type for updating product stor join table____END
 
 // new type for updating certain shopping list____START
 const UpdateShoppingList = new GraphQLObjectType({
@@ -155,7 +195,13 @@ const ProductShoppinglistType = new GraphQLObjectType({
   }),
 });
 
-const userID = 17;
+const UpdatePricesResult = new GraphQLObjectType({
+  name: "UpdatePricesResult",
+  fields: {
+    success: { type: GraphQLBoolean },
+  },
+});
+
 const RootQueryType = new GraphQLObjectType({
   name: "Query",
   description: "Root Query",
@@ -190,7 +236,7 @@ const RootQueryType = new GraphQLObjectType({
         resolve: (p, args) => {
           return ProductShoppinglists.findAll({
             where: {
-              shoppinglistId: 25,
+              shoppinglistId: 25, // TODO: figure out
             },
           });
         },
@@ -241,7 +287,6 @@ const RootQueryType = new GraphQLObjectType({
         },
       },
       resolve: (p, args, context) => {
-        console.log(args);
         return ShoppingLists.findByPk(args.id);
       },
     },
@@ -366,6 +411,47 @@ const RootMutationType = new GraphQLObjectType({
         return [];
       },
     },
+    updatePrices: {
+      type: UpdatePricesResult,
+      args: {
+        prices: {
+          type: new GraphQLList(NewProductPrices),
+        },
+      },
+      resolve: async (p, args, c) => {
+        const newPrices = args.prices.filter((p) => {
+          return p.productPrice !== null;
+        });
+        // check existing price, if different, insert new row
+        let pendingOperations = newPrices.map(
+          async ({ productId, storeId, productPrice }) => {
+            const latestProductPrice = await ProductStores.findOne({
+              where: {
+                productId: productId,
+                storeId: storeId,
+              },
+              order: [["createdAt", "DESC"]],
+            });
+       1     // If no price entry or latest price entry has different value
+            if (
+              !latestProductPrice ||
+              latestProductPrice.productPrice !== productPrice
+            ) {
+              await ProductStores.create({
+                productId: productId,
+                storeId: storeId,
+                productPrice: productPrice,
+              });
+            }
+          }
+        );
+        // https://gomakethings.com/waiting-for-multiple-all-api-responses-to-complete-with-the-vanilla-js-promise.all-method/
+        await Promise.all(pendingOperations);
+        return {
+          success: true,
+        };
+      },
+    },
   }),
 });
 
@@ -398,4 +484,6 @@ app.use(
   })
 );
 
-app.listen(PORT, () => {});
+app.listen(PORT, () => {
+  console.log("Server started:", PORT);
+});
