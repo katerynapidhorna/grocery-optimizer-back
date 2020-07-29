@@ -9,7 +9,7 @@ module.exports = {
     const Product2 = await Product.findOne({where:{name:'Bread'}});
     const Product3 = await Product.findOne({where:{name:'T-shirt'}});
     const Store1 = await Store.findOne({where:{ name:'Lidl'}});
-    const Store2 = await Store.findOne({where:{ name:'H&M'}});
+    const Store2 = await Store.findOne({where:{ name:'Jumbo'}});
     const Store3 = await Store.findOne({where:{ name:'AH'}});
 
     return queryInterface.bulkInsert("productStores",[
