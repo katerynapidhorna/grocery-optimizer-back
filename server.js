@@ -326,86 +326,59 @@ const RootMutationType = new GraphQLObjectType({
             },
           });
           await ownersList.update({ title: args.list.title });
-          // updating join table ProductShoppinglists____________________START
-          // find all rows in join table with this list id
-          const result = await ProductShoppinglists.findAll({
-            where: {
-              shoppinglistId: args.list.id,
-            },
-          });
-          //getting array of products ids
-          const productsWithId = await args.products.filter((pId) => {
-            if (pId.id !== null) {
-              return pId.id;
+          const productsWithId = await args.products.filter((product) => {
+            if (product.id !== null) {
+              return product.id;
             }
           });
 
           const productsWithIdArrayOfIds = productsWithId.map((p) => {
             return p.id;
           });
-          // delete them all from ProductShoppinglists result
-          productsWithIdArrayOfIds.forEach((id) => {
-            ProductShoppinglists.destroy({
-              where: {
-                productId: id,
-              },
-            });
-          });
-          // add new ones
-          productsWithId.forEach((p) => {
-            ProductShoppinglists.create({
-              productId: p.id,
-              shoppinglistId: args.list.id,
-              productAmount: p.amount,
-              purchased: false,
-            });
-          });
-          //adding all new products ids
 
-          // updating join table ProductShoppinglists____________________END
-          //updating table Products____________________________START
-          productsWithId.forEach((p) => {
-            Products.update(
-              { name: p.name, amount: p.amount },
-              {
-                where: {
-                  id: p.id,
-                },
-              }
-            );
+          const existingProducts = await ProductShoppinglists.findAll({
+            where: {
+              productId: productsWithIdArrayOfIds,
+              shoppinglistId: args.list.id,
+            },
           });
-          const productsWithoutId = await args.products.filter((p) => {
+          await ProductShoppinglists.destroy({
+            where: {
+              shoppinglistId: args.list.id,
+            },
+          });
+          const productsCreation = existingProducts.map(async (product) => {
+            const newProductData = productsWithId.find((p) => {
+              return p.id === product.productId;
+            });
+            return ProductShoppinglists.create({
+              id: product.id,
+              productId: newProductData.id,
+              shoppinglistId: args.list.id,
+              productAmount: newProductData.amount,
+              purchased: product.purchased,
+            });
+          });
+          await Promise.all(productsCreation);
+          const productsWithoutId = args.products.filter((p) => {
             if (p.id === null) {
               return p;
             }
           });
-
-          let productsWithoutIdCreated = productsWithoutId.map((p) => {
-            return Products.create({
+          const productsWithoutIdCreated = productsWithoutId.map(async (p) => {
+            const createdProduct = await Products.create({
               name: p.name,
-              amount: p.amount,
+              amount: 0,
+              unit: "unit",
+            });
+            return ProductShoppinglists.create({
+              productId: createdProduct.id,
+              shoppinglistId: args.list.id,
+              purchased: false,
+              productAmount: p.amount,
             });
           });
           await Promise.all(productsWithoutIdCreated);
-
-          //updating table Products____________________________END
-          //adding all products ids which were just created to a ProductShoppingList table___START
-          const allProductIds = await Products.findAll();
-          const AllProductId = allProductIds.map((p) => {
-            return p.dataValues.id;
-          });
-
-          AllProductId.forEach(async (id) => {
-            const existingId = await ProductShoppinglists.findByPk(id);
-            if (!existingId) {
-              ProductShoppinglists.create({
-                productId: id,
-                shoppinglistId: args.list.id,
-                purchased: false,
-              });
-            }
-          });
-          //adding all products ids which were just created to a ProductShoppingList table___END
         }
 
         return [];
@@ -432,7 +405,7 @@ const RootMutationType = new GraphQLObjectType({
               },
               order: [["createdAt", "DESC"]],
             });
-       1     // If no price entry or latest price entry has different value
+            1; // If no price entry or latest price entry has different value
             if (
               !latestProductPrice ||
               latestProductPrice.productPrice !== productPrice
