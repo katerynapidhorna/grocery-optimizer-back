@@ -427,19 +427,26 @@ const RootMutationType = new GraphQLObjectType({
     },
     updatePurchased: {
       type: ProductShoppinglistType,
-      args:{
+      args: {
         productId: { type: new GraphQLList(GraphQLInt) },
-        purchased: {type: GraphQLBoolean}
+        purchased: { type: GraphQLBoolean },
+        shoppinglistId: {type:GraphQLNonNull( GraphQLInt )}
       },
-      resolve:async(p,args,context)=>{
-        const allProdutsIdsToChangePurchased = await ProductShoppinglists.update({
-          purchased: args.purchased
-        },{where:{productId: args.productId}})
-
-
-      }
-    }
-  }), 
+      resolve: async (p, args, context) => {
+        console.log(args)
+        const allProdutsIdsToChangePurchased = await ProductShoppinglists.update(
+          {
+            purchased: args.purchased,
+          },
+          { where: { 
+                    shoppinglistId: args.shoppinglistId,
+                    productId: args.productId 
+                   } 
+          }
+        );
+      },
+    },
+  }),
 });
 
 // mutations____________________________________________END
